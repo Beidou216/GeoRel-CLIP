@@ -1,6 +1,6 @@
 # GeoRel-CLIP
 
-**GeoRel-CLIP** is a geometry-aware relational post-pre-training method for vision-language alignment, built on top of [CLIP-Refine](https://github.com/nttcslab/clip-refine) (CVPR 2025). It extends the baseline with **AnchorBank**, **anchor-diversity regularization (Ldiv)**, **uniformity regularization (Luni)**, and **Relational KD (RKD)**.
+**GeoRel-CLIP** is a geometry-aware relational post-pre-training method for vision-language alignment. It extends the baseline with **AnchorBank**, **anchor-diversity regularization (Ldiv)**, **uniformity regularization (Luni)**, and **Relational KD (RKD)**.
 
 - **Proposed method**: GeoRel-CLIP — `config/01_post-pre-training/GeoRel-CLIP.yaml`
 - **Baseline**: CLIP-Refine — `config/01_post-pre-training/clip-refine.yaml`
