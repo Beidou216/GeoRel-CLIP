@@ -1,0 +1,385 @@
+import os
+from typing import Any, Tuple
+
+import torch
+import torchvision.datasets
+
+
+class GenericDataset(torchvision.datasets.ImageFolder):
+
+    def __init__(self, root, transform, test=False, **kwargs) -> None:
+        assert (root is not None) and (transform is not None)
+        train = not test
+        if train:
+            split_data_dir = os.path.join(root, "train")
+        else:
+            split_data_dir = os.path.join(root, "test")
+        super(GenericDataset, self).__init__(root=split_data_dir, transform=transform)
+
+
+class Aircraft(torch.utils.data.Dataset):
+    """FGVC Aircraft dataset with proper train/test split"""
+
+    def __init__(self, transform, test=True, **kwargs):
+        self.root = "/root/autodl-tmp/dataset/Aircraft"
+        self.data_dir = os.path.join(self.root, "data")
+        self.variants_file = os.path.join(self.root, "variants.txt")
+        self.transform = transform
+        self.test = test
+
+        # Read variants to create class name mapping
+        self.variant_to_id = {}
+        with open(self.variants_file, 'r') as f:
+            for idx, line in enumerate(f):
+                variant = line.strip()
+                self.variant_to_id[variant] = idx
+
+        # Create all possible class names (100 classes total)
+        self.classes = []
+        for idx in range(100):  # FGVC Aircraft has 100 classes
+            if idx in self.variant_to_id.values():
+                variant = [k for k, v in self.variant_to_id.items() if v == idx][0]
+                class_name = f"class_{idx:03d}_{variant}"
+            else:
+                class_name = f"class_{idx:03d}_unknown"
+            self.classes.append(class_name)
+
+        # Determine split file
+        if test:
+            split_file = os.path.join(self.root, "images_variant_test.txt")
+        else:
+            split_file = os.path.join(self.root, "images_variant_trainval.txt")
+
+        # Load samples
+        self.samples = []
+        with open(split_file, 'r') as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) == 2:
+                    img_name = parts[0]
+                    variant = parts[1]
+
+                    if variant in self.variant_to_id:
+                        class_id = self.variant_to_id[variant]
+                        img_path = os.path.join(self.data_dir, img_name + ".jpg")
+                        if os.path.exists(img_path):
+                            self.samples.append((img_path, class_id))
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        img_path, class_id = self.samples[idx]
+
+        from torchvision.datasets.folder import default_loader
+        image = default_loader(img_path)
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image, class_id
+
+
+class Bird(GenericDataset):
+
+    def __init__(self, transform, test=True, **kwargs):
+        super(Bird, self).__init__(
+            root="/dataset/CUB-200-2011",
+            transform=transform,
+            test=test,
+        )
+
+
+class Car(GenericDataset):
+
+    def __init__(self, transform, test=True, **kwargs):
+        super(Car, self).__init__(
+            root="/dataset/StanfordCars",
+            transform=transform,
+            test=test,
+        )
+
+
+class Caltech101(GenericDataset):
+
+    def __init__(self, transform, test=True, **kwargs):
+        super(Caltech101, self).__init__(
+            root="/dataset/Caltech101",
+            transform=transform,
+            test=test,
+        )
+
+
+class DTD(GenericDataset):
+
+    def __init__(self, transform, test=True, **kwargs):
+        super(DTD, self).__init__(
+            root="/dataset/DTD",
+            transform=transform,
+            test=test,
+        )
+
+
+class EuroSAT(GenericDataset):
+
+    def __init__(self, transform, test=True, **kwargs):
+        super(EuroSAT, self).__init__(
+            root="/dataset/EuroSAT",
+            transform=transform,
+            test=test,
+        )
+
+
+class Food(GenericDataset):
+
+    def __init__(self, transform, test=True, **kwargs):
+        super(Food, self).__init__(
+            root="/dataset/Food101",
+            transform=transform,
+            test=test,
+        )
+
+
+class Flower(torch.utils.data.Dataset):
+    """Oxford Flowers dataset with proper train/test split"""
+
+    def __init__(self, transform, test=True, **kwargs):
+        self.root = "/root/autodl-tmp/dataset/OxfordFlower102"
+        self.images_dir = os.path.join(self.root, "jpg")
+        self.setid_file = os.path.join(self.root, "setid.mat")
+        self.labels_file = os.path.join(self.root, "imagelabels.mat")
+        self.transform = transform
+        self.test = test
+
+        # Load set IDs and labels using scipy
+        from scipy.io import loadmat
+        setid = loadmat(self.setid_file)
+        labels = loadmat(self.labels_file)
+
+        # Extract data
+        if test:
+            # Test set (setid['tstid'][0] contains 1-based indices)
+            image_ids = setid['tstid'][0] - 1  # Convert to 0-based
+        else:
+            # Train set (setid['trnid'][0] contains 1-based indices)
+            image_ids = setid['trnid'][0] - 1  # Convert to 0-based
+
+        # Get labels (labels['labels'][0] contains 1-based class indices)
+        all_labels = labels['labels'][0] - 1  # Convert to 0-based
+
+        # Create samples
+        self.samples = []
+        for img_id in image_ids:
+            img_path = os.path.join(self.images_dir, f"image_{img_id + 1:05d}.jpg")
+            if os.path.exists(img_path):
+                label = all_labels[img_id]
+                self.samples.append((img_path, label))
+
+        # Create class names (102 classes)
+        self.classes = []
+        for i in range(102):
+            self.classes.append(f"class_{i:03d}")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        img_path, label = self.samples[idx]
+
+        from torchvision.datasets.folder import default_loader
+        image = default_loader(img_path)
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image, label
+
+
+class ImageNet(torchvision.datasets.ImageFolder):
+
+    def __init__(self, transform, test=False, **kwargs):
+        root = "/root/autodl-tmp/dataset/imagenet"
+        train = not test
+        if train:
+            split_data_dir = os.path.join(root, "train")
+        else:
+            split_data_dir = os.path.join(root, "val")
+        super(ImageNet, self).__init__(root=split_data_dir, transform=transform)
+
+
+class Pet(torchvision.datasets.DatasetFolder):
+    """Oxford Pets dataset with proper train/test split"""
+
+    def __init__(self, transform, test=True, **kwargs):
+        # Oxford Pets dataset structure: images/ and annotations/
+        root = "/root/autodl-tmp/dataset/OxfordPets"
+        images_dir = os.path.join(root, "images")
+        annotations_dir = os.path.join(root, "annotations")
+
+        # Create a temporary directory structure for ImageFolder
+        import tempfile
+        import shutil
+
+        # Create temporary directory
+        self.temp_dir = tempfile.mkdtemp()
+
+        # Read class names from the classname file
+        classname_file = "/root/autodl-tmp/data/classnames/oxford_pets.txt"
+        id_to_classname = {}
+        with open(classname_file, 'r') as f:
+            for line in f:
+                parts = line.strip().split('\t')
+                if len(parts) == 2:
+                    class_id = int(parts[0])
+                    class_name = parts[1]
+                    id_to_classname[class_id] = class_name
+
+        # Read the appropriate split file
+        if test:
+            split_file = os.path.join(annotations_dir, "test.txt")
+        else:
+            split_file = os.path.join(annotations_dir, "trainval.txt")
+
+        # Read split file and organize by class
+        class_images = {}
+        with open(split_file, 'r') as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    img_name = parts[0]
+                    class_id = int(parts[1]) - 1  # Convert from 1-based to 0-based indexing
+
+                    # Use the correct class name from the mapping
+                    if class_id in id_to_classname:
+                        class_name = id_to_classname[class_id]
+
+                        if class_name not in class_images:
+                            class_images[class_name] = []
+                        class_images[class_name].append(img_name)
+
+        # Create class directories and copy files
+        for class_name, img_list in class_images.items():
+            class_dir = os.path.join(self.temp_dir, class_name)
+            os.makedirs(class_dir, exist_ok=True)
+
+            # Copy images for this class
+            for img_name in img_list:
+                src = os.path.join(images_dir, img_name + ".jpg")
+                dst = os.path.join(class_dir, img_name + ".jpg")
+                if os.path.exists(src):
+                    shutil.copy2(src, dst)
+
+        # Now use the temporary directory with ImageFolder
+        from torchvision.datasets.folder import default_loader
+        super(Pet, self).__init__(root=self.temp_dir, loader=default_loader, extensions=('.jpg', '.jpeg', '.png'),
+                                  transform=transform)
+
+    def __del__(self):
+        # Clean up temporary directory
+        if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+            import shutil
+            shutil.rmtree(self.temp_dir)
+
+
+class PetWithText(torchvision.datasets.DatasetFolder):
+    """Pet dataset that returns image-text pairs for training"""
+
+    def __init__(self, transform, tokenizer, test=False, **kwargs):
+        root = "/root/autodl-tmp/dataset/OxfordPets"
+        images_dir = os.path.join(root, "images")
+        annotations_dir = os.path.join(root, "annotations")
+
+        # Create a temporary directory structure for ImageFolder
+        import tempfile
+        import shutil
+
+        # Create temporary directory
+        self.temp_dir = tempfile.mkdtemp()
+
+        # Read class names from the classname file
+        classname_file = "/root/autodl-tmp/data/classnames/oxford_pets.txt"
+        id_to_classname = {}
+        with open(classname_file, 'r') as f:
+            for line in f:
+                parts = line.strip().split('\t')
+                if len(parts) == 2:
+                    class_id = int(parts[0])
+                    class_name = parts[1]
+                    id_to_classname[class_id] = class_name
+
+        # Read the appropriate split file
+        if test:
+            split_file = os.path.join(annotations_dir, "test.txt")
+        else:
+            split_file = os.path.join(annotations_dir, "trainval.txt")
+
+        # Read split file and organize by class
+        class_images = {}
+        with open(split_file, 'r') as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    img_name = parts[0]
+                    class_id = int(parts[1]) - 1  # Convert from 1-based to 0-based indexing
+
+                    # Use the correct class name from the mapping
+                    if class_id in id_to_classname:
+                        class_name = id_to_classname[class_id]
+
+                        if class_name not in class_images:
+                            class_images[class_name] = []
+                        class_images[class_name].append(img_name)
+
+        # Create class directories and copy files
+        for class_name, img_list in class_images.items():
+            class_dir = os.path.join(self.temp_dir, class_name)
+            os.makedirs(class_dir, exist_ok=True)
+
+            # Copy images for this class
+            for img_name in img_list:
+                src = os.path.join(images_dir, img_name + ".jpg")
+                dst = os.path.join(class_dir, img_name + ".jpg")
+                if os.path.exists(src):
+                    shutil.copy2(src, dst)
+
+        # Now use the temporary directory with ImageFolder
+        from torchvision.datasets.folder import default_loader
+        super(PetWithText, self).__init__(root=self.temp_dir, loader=default_loader,
+                                          extensions=('.jpg', '.jpeg', '.png'), transform=transform)
+        self.tokenizer = tokenizer
+
+        # Create class name mapping
+        self.class_names = [cls.replace('_', ' ') for cls in self.classes]
+
+    def __getitem__(self, index):
+        image, label = super().__getitem__(index)
+        class_name = self.class_names[label]
+        text = f"a photo of a {class_name}"
+        text_input = self.tokenizer(text)
+        return image, text_input
+
+    def __del__(self):
+        # Clean up temporary directory
+        if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+            import shutil
+            shutil.rmtree(self.temp_dir)
+
+
+class SUN397(GenericDataset):
+
+    def __init__(self, transform, test=True, **kwargs):
+        super(SUN397, self).__init__(
+            root="/dataset/SUN397",
+            transform=transform,
+            test=test,
+        )
+
+
+class UCF101(GenericDataset):
+
+    def __init__(self, transform, test=True, **kwargs):
+        super(UCF101, self).__init__(
+            root="/dataset/UCF101",
+            transform=transform,
+            test=test,
+        )

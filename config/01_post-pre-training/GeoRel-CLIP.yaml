@@ -1,0 +1,87 @@
+# =========================
+# Experiment & IO
+# =========================
+pattern: GeoRel-CLIP
+main: main/train.py
+epoch: 1
+batchsize: 512
+experiment_iterations: 1
+train_val_split_ratio: 0.99
+snapshot_interval: 1
+
+log_metrics:
+  [
+    "loss", "total_loss", "train_loss",
+    "loss_uni", "loss_div", "loss_kd_rel",
+    "align", "modality_gap", "mgap", "uniRBF", "feat_gap",
+    "sim_diag", "sim_offdiag", "margin",
+    "grad_norm"
+  ]
+
+
+# =========================
+# Model
+# =========================
+models:
+  pattern: CLIP-ViT-B_32
+  model:
+    func: /root/autodl-tmp/model/mod_clip.py
+    name: CLIP
+    args:
+      backbone_name: "ViT-B/32"
+
+# =========================
+# Datasets
+# =========================
+dataset:
+  dataset_func: /root/autodl-tmp/data/coco_caption.py
+  dataset_name: COCOCaption
+  args:
+    tokenizer: null
+    transform: null
+    test: False
+
+dataset_cls:
+  dataset_func: /root/autodl-tmp/data/generic.py
+  dataset_name: Pet
+  use_ratio: 1.0
+  classname_file: "/root/autodl-tmp/data/classnames/oxford_pets.txt"
+  args:
+    transform: null
+    test: False
+
+# =========================
+# Optimizer
+# =========================
+optimizer:
+  algorithm: AdamW
+  args:
+    lr: 1.0e-6
+    weight_decay: 0.1
+
+# =========================
+# Updater (GeoRel-CLIP)
+# =========================
+updater:
+  func: /root/autodl-tmp/updater/georel_clip.py
+  name: GeoRelCLIPUpdater
+  args:
+    # Main contrastive loss
+    lambda_cont: 0.2
+
+    # AnchorBank
+    use_anchor_bank: true
+    num_anchors: 1024
+    anchor_assign_topk: 5
+    anchor_noise_std: 0.05
+    T_rotate: 100
+
+    # Regularization
+    beta_uni: 0.2
+    use_anchor_diversity: true
+    gamma_div: 0.05
+
+    # Relational KD
+    use_rkd: true
+    lambda_rkd: 0.05
+    rkd_temperature: 1.0
